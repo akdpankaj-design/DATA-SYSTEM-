@@ -67,6 +67,22 @@ header{background:var(--spine)}#sb{background:color-mix(in srgb,var(--spine) 70%
 body.hw-bn .bn,body.hw-gs .gs,body.hw-rec .w-rec,body.hw-qa .w-qa,body.hw-col .w-col,body.hw-top .w-top,body.hw-tk #tk,body.hw-tl #tiles,body.hw-tl #home .dh{display:none}
 body.hide .kpi b,body.hide .gk b,body.hide .gk small,body.hide td.n,body.hide .rt em,body.hide .tile em{filter:blur(7px)}
 .pmap{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}.pt{background:var(--c);color:#fff;border:0;border-radius:10px;padding:12px 0;font:700 .8rem var(--sans);cursor:pointer}.lgd{display:inline-flex;gap:6px;align-items:center;font-size:.75rem;margin-right:12px}.lgd i{width:12px;height:12px;border-radius:3px;display:inline-block;background:var(--c)}
+</style><style id="mobile-fix">
+/* Phone header fix: title never gets squeezed, search moves to its own row */
+@media(max-width:899px){
+  header{flex-wrap:wrap;gap:8px 6px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px}
+  header .tt{order:1;flex:1 1 0;min-width:0}
+  #ttl{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #sync{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mn,#bk{order:0}
+  header>button,header>.avc{order:2;flex:none}
+  header>button{padding:6px 8px;min-width:34px}
+  header .sbx{order:5;flex:1 0 100%;width:100%;min-width:0}
+  header .sbx input{width:100%}
+}
+header:has(#bk:not([hidden])) #mn{display:none} /* back button replaces menu button inside a section */
+@media(max-width:420px){#ttl{font-size:1rem}header .tt small{font-size:.65rem}}
+@media(max-height:520px){header{position:static}}
 </style></head><body>
 <aside id="sb"></aside><div id="ov" onclick="sbT()"></div>
 <header><button id="mn" onclick="sbT()">☰</button><button id="bk" onclick="back()" hidden>‹</button><div class="tt"><b id="ttl">Home</b><small id="sync">Akshardham Associates</small></div><div class="sbx"><input id="gs" placeholder="Search anything… (Ctrl+K)" oninput="gSearch()" autocomplete="off"><div id="sr" class="dd"></div></div><button id="eye" onclick="tgHide()" title="Hide / show amounts">👁</button><span class="dtc" id="dt"></span><button id="bl" onclick="ntT()">🔔<i id="nb"></i></button><button onclick="sync()">⟳</button><span class="avc" id="av" onclick="nav(8)">RP</span><div id="nt" class="dd"></div></header>
