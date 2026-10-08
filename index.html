@@ -585,7 +585,7 @@ const _render=render;render=function(){_render();if(F.cv===9)btRender()};
 const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend','<button class="tile" style="--c:#0F766E" onclick="nav(9,0)"><span class="ic">🛠️</span><b>Business Tools</b><small>P&amp;L · Reminders · Agreements</small><em>Project-wise profit</em></button>')};
 sbAct(F.cv===undefined?-1:F.cv);rHome();
 })();
-</script><!-- SALARY ADD-ON v1 : paste just above </body> in index.html -->
+</script><!-- SALARY ADD-ON v2 : paste just above </body> in index.html -->
 <script>
 (function(){
 // ====== SETTINGS ======
@@ -594,7 +594,7 @@ var SHEET_URL = '';
 var KEY = 'salaryAddon_v1';
 
 // ====== DATA ======
-var db = load();
+var db = load(); db.cfg = db.cfg || {url:'', def:'dash'};
 function load(){
   try{ var d = JSON.parse(localStorage.getItem(KEY)); if(d) return d; }catch(e){}
   var n = new Date();
@@ -657,26 +657,39 @@ function distribute(m){
   save();
 }
 
-// ====== SHEET SYNC (one place to adjust) ======
-function push(){
-  if(!SHEET_URL) return;
-  var rows = [];
-  Object.keys(db.months).sort().forEach(function(m){
-    db.emps.forEach(function(e){
-      if(!db.months[m][e.id]) return;
-      var r=rec(m,e.id);
-      rows.push([m,e.name,+e.basic,r.leave,Math.round(r.cut),r.ot,Math.round(r.otAmt),r.ded,Math.round(r.net),r.paid?'Paid':'Open']);
-    });
-  });
-  var body = {
-    action:'salary',
-    tabs:{
-      'Salary_Records':{head:['Month','Employee','Basic','Leave days','Leave cut','OT hrs','OT amount','Advance deduction','Net pay','Status'], rows:rows},
-      'Salary_Advances':{head:['Date','Employee','Amount','Note','Given by'], rows:db.adv.map(function(a){return [a.date,(emp(a.emp)||{}).name,+a.amt,a.note||'',a.by||''];})},
-      'Salary_Repayments':{head:['Date','Employee','Amount','Method'], rows:db.rep.map(function(r){return [r.date,(emp(r.emp)||{}).name,+r.amt,r.method];})}
-    }
-  };
-  try{ fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}); }catch(e){}
+// ====== SHEET SYNC (only changed rows, batched) ======
+var timer=null;
+var HEAD={
+  Salary_Records:['Key','Month','Employee','Basic','Leave days','Leave cut','OT hrs','OT amount','Advance deduction','Net pay','Status'],
+  Salary_Advances:['Key','Date','Employee','Amount','Note','Given by'],
+  Salary_Repayments:['Key','Date','Employee','Amount','Method']
+};
+function sheetUrl(){ return db.cfg.url || SHEET_URL; }
+function push(){ if(!sheetUrl()) return; clearTimeout(timer); timer=setTimeout(flush,2500); }
+function allRows(){
+  var t={Salary_Records:[],Salary_Advances:[],Salary_Repayments:[]};
+  Object.keys(db.months).sort().forEach(function(m){ db.emps.forEach(function(e){
+    if(!db.months[m][e.id]) return; var r=rec(m,e.id);
+    t.Salary_Records.push([m+'|'+e.id,m,e.name,+e.basic,r.leave,Math.round(r.cut),r.ot,Math.round(r.otAmt),r.ded,Math.round(r.net),r.paid?'Paid':'Open']);
+  }); });
+  db.adv.forEach(function(a){ t.Salary_Advances.push([a.id,a.date,(emp(a.emp)||{}).name,+a.amt,a.note||'',a.by||'']); });
+  db.rep.forEach(function(r){ t.Salary_Repayments.push([r.id,r.date,(emp(r.emp)||{}).name,+r.amt,r.method]); });
+  return t;
+}
+function flush(){
+  var url=sheetUrl(); if(!url) return;
+  var sent={}; try{ sent=JSON.parse(localStorage.getItem(KEY+'_sent')||'{}'); }catch(e){}
+  var cur=allRows(), tabs={}, any=false, nsent={};
+  Object.keys(cur).forEach(function(tab){ cur[tab].forEach(function(row){
+    var k=tab+'|'+row[0], j=JSON.stringify(row); nsent[k]=j;
+    if(sent[k]!==j){ (tabs[tab]=tabs[tab]||{head:HEAD[tab],rows:[]}).rows.push(row); any=true; }
+  }); });
+  if(!any) return;
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'salary',delta:true,tabs:tabs})})
+      .then(function(){ try{ localStorage.setItem(KEY+'_sent',JSON.stringify(nsent)); }catch(e){} })
+      .catch(function(){});
+  }catch(e){}
 }
 
 // ====== UI ======
@@ -686,6 +699,7 @@ var css = '#sal-fab{position:fixed;right:14px;bottom:80px;z-index:9998;backgroun
 +'.sal-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#14532d;color:#fff;font-weight:600}'
 +'.sal-top button{background:none;border:0;color:#fff;font-size:22px}'
 +'.sal-tabs{display:flex;gap:4px;padding:8px;background:#e7ebe3;overflow-x:auto}'
++'.sal-tabs select{width:100%;padding:10px;border-radius:8px;border:1px solid #bfc5b9;font:600 15px system-ui,sans-serif;background:#fff}'
 +'.sal-tabs button{flex:1;white-space:nowrap;border:0;border-radius:8px;padding:9px 12px;background:#fff;color:#1c1f1a;font-weight:600}'
 +'.sal-tabs button.on{background:#14532d;color:#fff}'
 +'.sal-body{flex:1;overflow:auto;padding:12px}'
@@ -712,13 +726,13 @@ var ov = document.createElement('div'); ov.id='sal-ov'; document.body.appendChil
 var tab='dash', viewM=ym(new Date());
 if(viewM<db.start) viewM=db.start;
 
-fab.onclick=function(){ ov.classList.add('open'); draw(); };
+fab.onclick=function(){ tab=db.cfg.def||'dash'; ov.classList.add('open'); draw(); };
 
 function draw(){
-  var tabs=[['dash','Dashboard'],['emps','Employees'],['adv','Advances'],['rep','Report']];
+  var secs=[['dash','Dashboard'],['emps','Employees'],['adv','Advances'],['rep','Report'],['set','Settings']];
   ov.innerHTML='<div class="sal-top"><span>Salary & Advances</span><button data-a="close">×</button></div>'
-   +'<div class="sal-tabs">'+tabs.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'" class="'+(tab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>'
-   +'<div class="sal-body">'+({dash:vDash,emps:vEmps,adv:vAdv,rep:vRep}[tab])()+'</div>';
+   +'<div class="sal-tabs"><select data-a="sec">'+secs.map(function(t){return '<option value="'+t[0]+'"'+(tab===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select></div>'
+   +'<div class="sal-body">'+({dash:vDash,emps:vEmps,adv:vAdv,rep:vRep,set:vSet})[tab]()+'</div>';
 }
 
 function monthPicker(){
@@ -728,9 +742,16 @@ function monthPicker(){
 
 function vDash(){
   var cur=ym(new Date()); if(cur<db.start) cur=db.start;
+  var total=monthTotal(cur);
+  var paidE=db.emps.filter(function(e){return rec(cur,e.id).paid;});
+  var paid=sum(paidE,function(e){return rec(cur,e.id).net;});
   var pend=sum(db.emps,function(e){return Math.max(0,pending(e.id));});
-  var h='<div class="sal-card"><div>Pay amount, '+mName(cur)+'</div><div class="sal-big">'+inr(monthTotal(cur))+'</div>'
-   +'<div>'+db.emps.length+' employees</div></div>';
+  var h='<div class="sal-card"><div>Total pay amount, '+mName(cur)+'</div><div class="sal-big">'+inr(total)+'</div>'
+   +'<div class="sal-row"><span>Paid amount</span><b class="sal-pos">'+inr(paid)+'</b></div>'
+   +'<div class="sal-row"><span>Still to pay</span><b>'+inr(total-paid)+'</b></div></div>';
+  h+='<div class="sal-card"><b>Paid this month ('+paidE.length+' of '+db.emps.length+')</b>'
+   +(paidE.map(function(e){return '<div class="sal-row sal-emp" data-a="open" data-v="'+e.id+'" data-m="'+cur+'"><span>'+esc(e.name)+'</span><b>'+inr(rec(cur,e.id).net)+'</b></div>';}).join('')||'<div>No one paid yet.</div>')
+   +'</div>';
   h+='<div class="sal-card"><b>Coming months (estimate)</b>';
   for(var i=1;i<=3;i++) h+='<div class="sal-row"><span>'+mName(addM(cur,i))+'</span><b>'+inr(estimate(i))+'</b></div>';
   h+='</div><div class="sal-card"><div>Advance outstanding</div><div class="sal-big">'+inr(pend)+'</div>'
@@ -773,13 +794,29 @@ function vAdv(){
 
 function vRep(){
   var cur=ym(new Date()); if(cur<db.start) cur=db.start;
-  var h='<div class="sal-card"><b>Monthly report</b><table><tr><th>Month</th><th>Basic</th><th>Leave cut</th><th>OT</th><th>Advance</th><th>Net</th></tr>';
-  monthsList(addM(cur,0)).forEach(function(m){
+  var h=monthPicker();
+  var paid=sum(db.emps,function(e){var r=rec(viewM,e.id);return r.paid?r.net:0;});
+  h+='<div class="sal-card"><b>'+mName(viewM)+'</b>'
+   +(db.emps.map(function(e){var r=rec(viewM,e.id);
+     return '<div class="sal-row sal-emp" data-a="open" data-v="'+e.id+'" data-m="'+viewM+'"><span>'+esc(e.name)+' <span class="sal-tag '+(r.paid?'Clear':'Pending')+'">'+(r.paid?'Paid':'Open')+'</span></span><b>'+inr(r.net)+'</b></div>';}).join('')||'<div>No employees yet.</div>')
+   +'<div class="sal-row"><b>Total payable</b><b>'+inr(monthTotal(viewM))+'</b></div>'
+   +'<div class="sal-row"><b>Paid so far</b><b class="sal-pos">'+inr(paid)+'</b></div></div>';
+  h+='<div class="sal-card" style="overflow:auto"><b>All months</b><table style="width:100%;font-size:12px"><tr><th align="left">Month</th><th>Basic</th><th>Leave cut</th><th>OT</th><th>Advance</th><th>Net</th></tr>';
+  monthsList(cur).forEach(function(m){
     var b=sum(db.emps,function(e){return +e.basic;}), c=sum(db.emps,function(e){return rec(m,e.id).cut;}),
         o=sum(db.emps,function(e){return rec(m,e.id).otAmt;}), d=sum(db.emps,function(e){return rec(m,e.id).ded;});
-    h+='<tr><td>'+mName(m).replace(' 20',' ’')+'</td><td>'+inr(b)+'</td><td>'+inr(c)+'</td><td>'+inr(o)+'</td><td>'+inr(d)+'</td><td><b>'+inr(monthTotal(m))+'</b></td></tr>';
+    h+='<tr><td>'+mName(m)+'</td><td align="right">'+inr(b)+'</td><td align="right">'+inr(c)+'</td><td align="right">'+inr(o)+'</td><td align="right">'+inr(d)+'</td><td align="right"><b>'+inr(monthTotal(m))+'</b></td></tr>';
   });
   return h+'</table></div>';
+}
+
+function vSet(){
+  var secs=[['dash','Dashboard'],['emps','Employees'],['adv','Advances'],['rep','Report']];
+  return '<div class="sal-card"><b>Open this section first</b>'
+   +'<select id="sal-def">'+secs.map(function(t){return '<option value="'+t[0]+'"'+(db.cfg.def===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
+   +'<b>Google Sheet link (Apps Script URL)</b><input id="sal-url" placeholder="https://script.google.com/..." value="'+esc(db.cfg.url)+'">'
+   +'<button class="sal-btn" data-a="savecfg">Save settings</button> <button class="sal-btn alt" data-a="syncnow">Sync now</button></div>'
+   +'<div class="sal-card">Sync sends only rows that changed, a few seconds after you save.</div>';
 }
 
 function profile(id){
@@ -808,7 +845,7 @@ ov.addEventListener('click',function(ev){
   function val(i){ return document.getElementById(i).value; }
   if(a==='close') ov.classList.remove('open');
   else if(a==='tab'){ tab=v; draw(); }
-  else if(a==='open') profile(v);
+  else if(a==='open'){ if(t.dataset.m) viewM=t.dataset.m; profile(v); }
   else if(a==='dist'){ if(confirm('Distribute salary for '+mName(v)+'? Deductions will be recorded.')){ distribute(v); draw(); } }
   else if(a==='addemp'){
     if(!val('sal-n').trim()||!(+val('sal-b'))){ alert('Enter name and basic salary.'); return; }
@@ -823,9 +860,11 @@ ov.addEventListener('click',function(ev){
     var e2=emp(val('sal-re')); if(!e2||!(+val('sal-ra'))){ alert('Choose employee and amount.'); return; }
     db.rep.push({id:uid(),emp:e2.id,date:val('sal-rd'),amt:+val('sal-ra'),method:val('sal-rm')}); save(); draw();
   }
+  else if(a==='savecfg'){ db.cfg.def=val('sal-def'); db.cfg.url=val('sal-url').trim(); save(); alert('Settings saved.'); }
+  else if(a==='syncnow'){ flush(); alert('Sync started.'); }
   else if(a==='unhold'){ emp(v).hold=false; save(); draw(); }
 });
-ov.addEventListener('change',function(ev){ if(ev.target.dataset.a==='month'){ viewM=ev.target.value; draw(); } });
+ov.addEventListener('change',function(ev){ var a=ev.target.dataset.a; if(a==='month'){ viewM=ev.target.value; draw(); } else if(a==='sec'){ tab=ev.target.value; draw(); } });
 document.addEventListener('click',function(ev){
   var t=ev.target.closest('#sal-pop [data-a]'); if(!t) return;
   if(t.dataset.a==='closepop'){ document.getElementById('sal-pop').remove(); draw(); }
@@ -835,4 +874,5 @@ document.addEventListener('click',function(ev){
   }
 });
 })();
-</script></body></html>
+</script>
+</body></html>
