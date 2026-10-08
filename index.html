@@ -585,4 +585,254 @@ const _render=render;render=function(){_render();if(F.cv===9)btRender()};
 const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend','<button class="tile" style="--c:#0F766E" onclick="nav(9,0)"><span class="ic">🛠️</span><b>Business Tools</b><small>P&amp;L · Reminders · Agreements</small><em>Project-wise profit</em></button>')};
 sbAct(F.cv===undefined?-1:F.cv);rHome();
 })();
+</script><!-- SALARY ADD-ON v1 : paste just above </body> in index.html -->
+<script>
+(function(){
+// ====== SETTINGS ======
+// Paste your Apps Script web URL here. Leave '' to keep data on this device only.
+var SHEET_URL = '';
+var KEY = 'salaryAddon_v1';
+
+// ====== DATA ======
+var db = load();
+function load(){
+  try{ var d = JSON.parse(localStorage.getItem(KEY)); if(d) return d; }catch(e){}
+  var n = new Date();
+  return {start: ym(n), emps:[], months:{}, adv:[], rep:[]};
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){}
+  push();
+}
+function ym(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function addM(k,n){ var p=k.split('-'); return ym(new Date(+p[0], +p[1]-1+n, 1)); }
+function mName(k){ var p=k.split('-'); return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function inr(n){ return '₹'+Math.round(n).toLocaleString('en-IN'); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function emp(id){ return db.emps.filter(function(e){return e.id===id;})[0]; }
+function sum(a,f){ return a.reduce(function(t,x){return t+f(x);},0); }
+
+// ====== CALCULATIONS ======
+function pending(id){
+  return sum(db.adv.filter(function(a){return a.emp===id;}),function(a){return +a.amt;})
+       - sum(db.rep.filter(function(r){return r.emp===id;}),function(r){return +r.amt;});
+}
+function status(e){ if(e.hold) return 'Hold'; return pending(e.id)>0 ? 'Pending' : 'Clear'; }
+function rec(m,id){
+  var r = (db.months[m]||{})[id] || {leave:0, ot:0, ded:null, paid:false};
+  var e = emp(id), due = Math.max(0, Math.min(+e.inst||0, pending(id)));
+  var ded = r.paid ? r.ded : (r.ded==null ? due : +r.ded);
+  var cut = (+e.basic/30)*(+r.leave||0), otAmt = (+r.ot||0)*(+e.otRate||0);
+  return {leave:+r.leave||0, ot:+r.ot||0, paid:r.paid, ded:ded, due:due, cut:cut, otAmt:otAmt,
+          net:(+e.basic)-cut+otAmt-ded};
+}
+function setRec(m,id,patch){
+  db.months[m] = db.months[m]||{};
+  var r = db.months[m][id] || {leave:0, ot:0, ded:null, paid:false};
+  for(var k in patch) r[k]=patch[k];
+  db.months[m][id]=r;
+}
+function monthsList(upTo){
+  var out=[], k=db.start; while(k<=upTo){ out.push(k); k=addM(k,1); } return out;
+}
+function monthTotal(m){ return sum(db.emps,function(e){return rec(m,e.id).net;}); }
+function estimate(n){
+  // future month estimate: basic minus expected installment, using remaining pending
+  var tot=0;
+  db.emps.forEach(function(e){
+    var p=pending(e.id), d=0;
+    for(var i=0;i<n;i++){ d=Math.min(+e.inst||0,p); p-=d; }
+    tot += (+e.basic)-d;
+  });
+  return tot;
+}
+function distribute(m){
+  db.emps.forEach(function(e){
+    var r=rec(m,e.id); if(r.paid) return;
+    if(r.ded>0) db.rep.push({id:uid(), emp:e.id, date:new Date().toISOString().slice(0,10), amt:r.ded, method:'Salary deduction', month:m});
+    if(r.ded < r.due) e.hold=true;   // skipped / short deduction -> Hold
+    setRec(m,e.id,{ded:r.ded, paid:true});
+  });
+  save();
+}
+
+// ====== SHEET SYNC (one place to adjust) ======
+function push(){
+  if(!SHEET_URL) return;
+  var rows = [];
+  Object.keys(db.months).sort().forEach(function(m){
+    db.emps.forEach(function(e){
+      if(!db.months[m][e.id]) return;
+      var r=rec(m,e.id);
+      rows.push([m,e.name,+e.basic,r.leave,Math.round(r.cut),r.ot,Math.round(r.otAmt),r.ded,Math.round(r.net),r.paid?'Paid':'Open']);
+    });
+  });
+  var body = {
+    action:'salary',
+    tabs:{
+      'Salary_Records':{head:['Month','Employee','Basic','Leave days','Leave cut','OT hrs','OT amount','Advance deduction','Net pay','Status'], rows:rows},
+      'Salary_Advances':{head:['Date','Employee','Amount','Note','Given by'], rows:db.adv.map(function(a){return [a.date,(emp(a.emp)||{}).name,+a.amt,a.note||'',a.by||''];})},
+      'Salary_Repayments':{head:['Date','Employee','Amount','Method'], rows:db.rep.map(function(r){return [r.date,(emp(r.emp)||{}).name,+r.amt,r.method];})}
+    }
+  };
+  try{ fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}); }catch(e){}
+}
+
+// ====== UI ======
+var css = '#sal-fab{position:fixed;right:14px;bottom:80px;z-index:9998;background:#14532d;color:#fff;border:0;border-radius:24px;padding:11px 16px;font:600 14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}'
++'#sal-ov{position:fixed;inset:0;z-index:9999;background:#f6f7f4;color:#1c1f1a;font:14px/1.4 system-ui,sans-serif;display:none;flex-direction:column}'
++'#sal-ov.open{display:flex}'
++'.sal-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#14532d;color:#fff;font-weight:600}'
++'.sal-top button{background:none;border:0;color:#fff;font-size:22px}'
++'.sal-tabs{display:flex;gap:4px;padding:8px;background:#e7ebe3;overflow-x:auto}'
++'.sal-tabs button{flex:1;white-space:nowrap;border:0;border-radius:8px;padding:9px 12px;background:#fff;color:#1c1f1a;font-weight:600}'
++'.sal-tabs button.on{background:#14532d;color:#fff}'
++'.sal-body{flex:1;overflow:auto;padding:12px}'
++'.sal-card{background:#fff;border:1px solid #d9ddd4;border-radius:10px;padding:12px;margin-bottom:10px}'
++'.sal-big{font-size:28px;font-weight:700;color:#14532d}'
++'.sal-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #eef0eb}'
++'.sal-row:last-child{border:0}'
++'.sal-card input,.sal-card select,.sal-body select{width:100%;box-sizing:border-box;padding:9px;margin:4px 0 8px;border:1px solid #bfc5b9;border-radius:8px;font-size:14px}'
++'.sal-btn{background:#14532d;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:600}'
++'.sal-btn.alt{background:#fff;color:#14532d;border:1px solid #14532d}'
++'.sal-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}'
++'.Clear{background:#dcfce7;color:#14532d}.Pending{background:#fef3c7;color:#92400e}.Hold{background:#fee2e2;color:#991b1b}'
++'.sal-emp{cursor:pointer}'
++'.sal-mod{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}'
++'.sal-sheet{background:#f6f7f4;color:#1c1f1a;width:100%;max-width:560px;max-height:90vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px;font:14px/1.4 system-ui,sans-serif}'
++'.sal-sheet table{width:100%;border-collapse:collapse;font-size:12px}'
++'.sal-sheet th,.sal-sheet td{padding:6px 4px;border-bottom:1px solid #dfe3da;text-align:right}'
++'.sal-sheet th:first-child,.sal-sheet td:first-child{text-align:left}'
++'.sal-pos{color:#14532d}.sal-neg{color:#991b1b}';
+var st = document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+
+var fab = document.createElement('button'); fab.id='sal-fab'; fab.textContent='Salary'; document.body.appendChild(fab);
+var ov = document.createElement('div'); ov.id='sal-ov'; document.body.appendChild(ov);
+var tab='dash', viewM=ym(new Date());
+if(viewM<db.start) viewM=db.start;
+
+fab.onclick=function(){ ov.classList.add('open'); draw(); };
+
+function draw(){
+  var tabs=[['dash','Dashboard'],['emps','Employees'],['adv','Advances'],['rep','Report']];
+  ov.innerHTML='<div class="sal-top"><span>Salary & Advances</span><button data-a="close">×</button></div>'
+   +'<div class="sal-tabs">'+tabs.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'" class="'+(tab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>'
+   +'<div class="sal-body">'+({dash:vDash,emps:vEmps,adv:vAdv,rep:vRep}[tab])()+'</div>';
+}
+
+function monthPicker(){
+  var opts=''; for(var i=0;i<=5;i++){ var k=addM(db.start,i); opts+='<option value="'+k+'"'+(k===viewM?' selected':'')+'>'+mName(k)+'</option>'; }
+  return '<select data-a="month">'+opts+'</select>';
+}
+
+function vDash(){
+  var cur=ym(new Date()); if(cur<db.start) cur=db.start;
+  var pend=sum(db.emps,function(e){return Math.max(0,pending(e.id));});
+  var h='<div class="sal-card"><div>Pay amount, '+mName(cur)+'</div><div class="sal-big">'+inr(monthTotal(cur))+'</div>'
+   +'<div>'+db.emps.length+' employees</div></div>';
+  h+='<div class="sal-card"><b>Coming months (estimate)</b>';
+  for(var i=1;i<=3;i++) h+='<div class="sal-row"><span>'+mName(addM(cur,i))+'</span><b>'+inr(estimate(i))+'</b></div>';
+  h+='</div><div class="sal-card"><div>Advance outstanding</div><div class="sal-big">'+inr(pend)+'</div>'
+   +'<div>'+db.emps.filter(function(e){return e.hold;}).length+' on Hold</div></div>';
+  h+='<div class="sal-card"><button class="sal-btn" data-a="dist" data-v="'+cur+'">Distribute salary for '+mName(cur)+'</button></div>';
+  return h;
+}
+
+function vEmps(){
+  var h=monthPicker();
+  h+=db.emps.map(function(e){
+    var r=rec(viewM,e.id);
+    return '<div class="sal-card sal-emp" data-a="open" data-v="'+e.id+'"><div class="sal-row"><b>'+esc(e.name)+'</b><span class="sal-tag '+status(e)+'">'+status(e)+'</span></div>'
+     +'<div class="sal-row"><span>Net pay '+(r.paid?'(paid)':'')+'</span><b>'+inr(r.net)+'</b></div></div>';
+  }).join('') || '<p>No employees yet. Add the first one below.</p>';
+  h+='<div class="sal-card"><b>Add employee</b>'
+   +'<input id="sal-n" placeholder="Name"><input id="sal-b" type="number" placeholder="Basic salary per month">'
+   +'<input id="sal-o" type="number" placeholder="Overtime rate per hour">'
+   +'<input id="sal-i" type="number" placeholder="Advance installment per month (optional)">'
+   +'<button class="sal-btn" data-a="addemp">Save employee</button></div>';
+  return h;
+}
+
+function vAdv(){
+  var ops=db.emps.map(function(e){return '<option value="'+e.id+'">'+esc(e.name)+(e.hold?' (Hold)':'')+'</option>';}).join('');
+  var h='<div class="sal-card"><b>Give advance</b><select id="sal-ae">'+ops+'</select>'
+   +'<input id="sal-ad" type="date" value="'+new Date().toISOString().slice(0,10)+'"><input id="sal-aa" type="number" placeholder="Amount">'
+   +'<input id="sal-an" placeholder="Reason / note"><input id="sal-ab" placeholder="Given by">'
+   +'<button class="sal-btn" data-a="addadv">Save advance</button></div>';
+  h+='<div class="sal-card"><b>Record repayment</b><select id="sal-re">'+ops+'</select>'
+   +'<input id="sal-rd" type="date" value="'+new Date().toISOString().slice(0,10)+'"><input id="sal-ra" type="number" placeholder="Amount">'
+   +'<select id="sal-rm"><option>Salary deduction</option><option>Cash</option><option>Bank transfer</option></select>'
+   +'<button class="sal-btn" data-a="addrep">Save repayment</button></div>';
+  h+='<div class="sal-card"><b>Balances</b>'+(db.emps.map(function(e){
+    return '<div class="sal-row"><span>'+esc(e.name)+' <span class="sal-tag '+status(e)+'">'+status(e)+'</span></span><b>'+inr(Math.max(0,pending(e.id)))+'</b></div>'
+     +(e.hold?'<div style="text-align:right"><button class="sal-btn alt" data-a="unhold" data-v="'+e.id+'">Clear Hold</button></div>':'');
+  }).join('')||'No employees')+'</div>';
+  return h;
+}
+
+function vRep(){
+  var cur=ym(new Date()); if(cur<db.start) cur=db.start;
+  var h='<div class="sal-card"><b>Monthly report</b><table><tr><th>Month</th><th>Basic</th><th>Leave cut</th><th>OT</th><th>Advance</th><th>Net</th></tr>';
+  monthsList(addM(cur,0)).forEach(function(m){
+    var b=sum(db.emps,function(e){return +e.basic;}), c=sum(db.emps,function(e){return rec(m,e.id).cut;}),
+        o=sum(db.emps,function(e){return rec(m,e.id).otAmt;}), d=sum(db.emps,function(e){return rec(m,e.id).ded;});
+    h+='<tr><td>'+mName(m).replace(' 20',' ’')+'</td><td>'+inr(b)+'</td><td>'+inr(c)+'</td><td>'+inr(o)+'</td><td>'+inr(d)+'</td><td><b>'+inr(monthTotal(m))+'</b></td></tr>';
+  });
+  return h+'</table></div>';
+}
+
+function profile(id){
+  var e=emp(id), r=rec(viewM,id), m=document.createElement('div'); m.className='sal-mod'; m.id='sal-pop';
+  var rowsH=monthsList(viewM).map(function(k){var x=rec(k,id);
+    return '<tr><td>'+k+'</td><td>'+x.leave+'</td><td>'+inr(x.cut)+'</td><td>'+x.ot+'</td><td>'+inr(x.otAmt)+'</td><td>'+inr(x.ded)+'</td><td><b>'+inr(x.net)+'</b></td></tr>';}).join('');
+  var dis = r.paid ? ' disabled' : '';
+  m.innerHTML='<div class="sal-sheet"><div class="sal-row"><b style="font-size:17px">'+esc(e.name)+'</b><button class="sal-btn alt" data-a="closepop">Close</button></div>'
+   +'<div>'+mName(viewM)+' · <span class="sal-tag '+status(e)+'">'+status(e)+'</span> · Advance pending '+inr(Math.max(0,pending(id)))+'</div>'
+   +'<div class="sal-card" style="margin-top:10px">'
+   +'<div class="sal-row"><span>Basic salary</span><b>'+inr(e.basic)+'</b></div>'
+   +'<label>Leave days</label><input id="sal-pl" type="number" min="0" value="'+r.leave+'"'+dis+'>'
+   +'<div class="sal-row"><span>Leave cut</span><b class="sal-neg">− '+inr(r.cut)+'</b></div>'
+   +'<label>Overtime hours</label><input id="sal-po" type="number" min="0" value="'+r.ot+'"'+dis+'>'
+   +'<div class="sal-row"><span>Overtime amount</span><b class="sal-pos">+ '+inr(r.otAmt)+'</b></div>'
+   +'<label>Advance deduction</label><input id="sal-pd" type="number" min="0" value="'+r.ded+'"'+dis+'>'
+   +'<div class="sal-row"><span>Net pay</span><b style="font-size:18px">'+inr(r.net)+'</b></div>'
+   +(r.paid?'':'<button class="sal-btn" data-a="savepro" data-v="'+id+'">Save this month</button>')+'</div>'
+   +'<div class="sal-card" style="overflow:auto"><b>Month report</b><table><tr><th>Month</th><th>Leave</th><th>Cut</th><th>OT hrs</th><th>OT ₹</th><th>Adv</th><th>Net</th></tr>'+rowsH+'</table></div></div>';
+  document.body.appendChild(m);
+}
+
+ov.addEventListener('click',function(ev){
+  var t=ev.target.closest('[data-a]'); if(!t) return;
+  var a=t.dataset.a, v=t.dataset.v;
+  function val(i){ return document.getElementById(i).value; }
+  if(a==='close') ov.classList.remove('open');
+  else if(a==='tab'){ tab=v; draw(); }
+  else if(a==='open') profile(v);
+  else if(a==='dist'){ if(confirm('Distribute salary for '+mName(v)+'? Deductions will be recorded.')){ distribute(v); draw(); } }
+  else if(a==='addemp'){
+    if(!val('sal-n').trim()||!(+val('sal-b'))){ alert('Enter name and basic salary.'); return; }
+    db.emps.push({id:uid(),name:val('sal-n').trim(),basic:+val('sal-b'),otRate:+val('sal-o')||0,inst:+val('sal-i')||0,hold:false}); save(); draw();
+  }
+  else if(a==='addadv'){
+    var e=emp(val('sal-ae')); if(!e||!(+val('sal-aa'))){ alert('Choose employee and amount.'); return; }
+    if(e.hold){ alert(e.name+' is on Hold. Clear the Hold before giving a new advance.'); return; }
+    db.adv.push({id:uid(),emp:e.id,date:val('sal-ad'),amt:+val('sal-aa'),note:val('sal-an'),by:val('sal-ab')}); save(); draw();
+  }
+  else if(a==='addrep'){
+    var e2=emp(val('sal-re')); if(!e2||!(+val('sal-ra'))){ alert('Choose employee and amount.'); return; }
+    db.rep.push({id:uid(),emp:e2.id,date:val('sal-rd'),amt:+val('sal-ra'),method:val('sal-rm')}); save(); draw();
+  }
+  else if(a==='unhold'){ emp(v).hold=false; save(); draw(); }
+});
+ov.addEventListener('change',function(ev){ if(ev.target.dataset.a==='month'){ viewM=ev.target.value; draw(); } });
+document.addEventListener('click',function(ev){
+  var t=ev.target.closest('#sal-pop [data-a]'); if(!t) return;
+  if(t.dataset.a==='closepop'){ document.getElementById('sal-pop').remove(); draw(); }
+  if(t.dataset.a==='savepro'){
+    setRec(viewM,t.dataset.v,{leave:+document.getElementById('sal-pl').value||0, ot:+document.getElementById('sal-po').value||0, ded:+document.getElementById('sal-pd').value||0});
+    save(); document.getElementById('sal-pop').remove(); profile(t.dataset.v);
+  }
+});
+})();
 </script></body></html>
