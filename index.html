@@ -974,4 +974,234 @@ const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend'
 sbAct(F.cv===undefined?-1:F.cv);rHome();
 })();
 </script>
-</body></html>
+<!-- ===== REPORTS PLUS ADD-ON: paste just before </body>, AFTER the Business Tools and Salary blocks ===== -->
+<script id="rp-js">
+(function(){
+if(window.__rp)return;window.__rp=1;
+const RX=()=>S.set.rpx||(S.set.rpx={}),A=k=>RX()[k]||(RX()[k]=[]),O=k=>RX()[k]||(RX()[k]={}),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const gp=n=>(LM().get(norm(n))||{}).group,isCB=n=>['Cash-in-hand','Bank Accounts'].includes(gp(n)),isEx=n=>GR[gp(n)]==='E';
+const pj=()=>projects().map(p=>p.name),q=()=>({p:$('rpP').value,f:$('rpF').value,t:$('rpT').value});
+const inR=(v,Q)=>(!Q.p||v.project===Q.p)&&(!Q.f||String(v.date)>=Q.f)&&(!Q.t||String(v.date)<=Q.t);
+const exp_=()=>allE().filter(v=>isEx(v.dr)),expP=p=>sum(exp_().filter(v=>v.project===p),'amount'),sold=p=>S.stock.filter(s=>s.colony===p&&s.owner);
+const fy=d=>{d=d||today();const y=+d.slice(0,4);return +d.slice(5,7)>=4?y:y-1},mo=k=>k?new Date(k+'-01').toLocaleDateString('en-IN',{month:'short',year:'numeric'}):'No date';
+const bars=a=>{const m=Math.max(1,...a.map(x=>Math.abs(x[1])));return a.map(([l,v])=>`<div class="bt-row"><span>${esc(l)}</span><span class="bt-bar"><i style="width:${Math.abs(v)/m*100}%;background:var(${v>=0?'--ok':'--bad'})"></i></span><b>${inr(v)}</b></div>`).join('')};
+const grp=(E,f)=>{const m={};E.forEach(v=>{const k=f(v);m[k]=(m[k]||0)+v.amount});return Object.entries(m).sort((a,b)=>b[1]-a[1])};
+const dBtn=(k,id)=>`<button class="btn g" onclick="rpDel('${k}','${id}')">✕</button>`;
+const addB=(k,t)=>`<div class="chips"><button class="btn" onclick="rpAdd('${k}')">+ ${t}</button></div>`;
+
+const RPL=[['dc','Daily Collection','A. Daily'],['de','Daily Expense (Office-wise)','A. Daily'],['fu','Receivable Follow-up','B. Weekly'],
+['cf','Cash Flow Statement','C. Monthly'],['br','Bank Reconciliation','C. Monthly'],['pa','Payable Ageing','C. Monthly'],['tg','Collection vs Target','C. Monthly'],['cm','Commission Statement','C. Monthly'],['sal','Salary Report','C. Monthly'],
+['ab','Actual vs Forecast','D. Colony-wise'],['pp','Plot-wise Profitability','D. Colony-wise'],['lo','Land Owner Statement','D. Colony-wise'],['iv','Investor / Partner Statement','D. Colony-wise'],['co','Cashflow & Obligations','D. Colony-wise'],['cn','Cancelled / Refund','D. Colony-wise'],
+['ap','Annual P&L','E. Yearly'],['dk','ITR / Audit File','E. Yearly']];
+const META={dc:'d',de:'d',tg:'m',cf:'m'};
+
+const pdTable=kind=>{const R=A('pd').filter(x=>x.kind===kind),b=bal();
+ const rows=R.map(x=>{const n=norm(x.party),E=allE().filter(v=>norm(v.dr)===n||norm(v.cr)===n),outp=sum(E.filter(v=>norm(v.dr)===n),'amount'),inn=sum(E.filter(v=>norm(v.cr)===n),'amount');
+  if(kind==='land')return[lk(x.party),esc(x.pj),inr(x.amt),inr(outp),`<b class="${x.amt-outp>.5?'bad':'ok'}">${inr(x.amt-outp)}</b>`,dBtn('pd',x.id)];
+  const prof=sum(sold(x.pj),'deal')-expP(x.pj),sh=Math.max(0,prof)*(+x.pct||0)/100;
+  return[lk(x.party),esc(x.pj),inr(x.amt),inr(inn),(x.pct||0)+'%',inr(sh),inr(outp),`<b>${inr(inn+sh-outp)}</b>`,dBtn('pd',x.id)]});
+ return kind==='land'?T(['Land owner','Project','Deal amount','Paid (Day Book)','Baki','']
+  ,rows,[2,3,4]):T(['Investor','Project','Invested (agreed)','Received','Share %','Profit share (est.)','Paid out','Balance owed',''],rows,[2,3,5,6,7])};
+
+const RP={
+dc(){const Q=q(),E=allE().filter(v=>v.type==='Receipt'&&inR(v,Q)).sort((a,b)=>String(b.date).localeCompare(String(a.date))),c=sum(E.filter(v=>gp(v.dr)!=='Bank Accounts'),'amount');
+ return`<div class="kpis">${K(E.length,'Receipts')}${K(inr(sum(E,'amount')),'Total collection','ok')}${K(inr(c),'Cash')}${K(inr(sum(E,'amount')-c),'Bank / UPI')}</div>`+T(['Date','Party','Project','Mode','Narration','Amount'],E.map(v=>[esc(v.date),lk(v.cr),esc(v.project),gp(v.dr)==='Bank Accounts'?'Bank':'Cash',esc(v.narration),inr(v.amount)]),[5])},
+de(){const Q=q(),E=exp_().filter(v=>inR(v,Q)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ return`<div class="kpis">${K(inr(sum(E,'amount')),'Total expense','bad')}${K(E.length,'Entries')}</div><h4>Office / Project-wise</h4>`+T(['Office / Project','Amount'],grp(E,v=>v.project||'Head Office / Unallocated').map(x=>[esc(x[0]),inr(x[1])]),[1])+'<h4>Ledger-wise</h4>'+T(['Expense head','Amount'],grp(E,v=>v.dr).map(x=>[esc(x[0]),inr(x[1])]),[1])+'<h4>Entries</h4>'+T(['Date','Head','Project','Narration','Amount'],E.map(v=>[esc(v.date),esc(v.dr),esc(v.project),esc(v.narration),inr(v.amount)]),[4])},
+fu(){const Q=q(),F_=O('fu'),M=new Map();S.stock.filter(s=>s.owner&&s.pend>.5&&(!Q.p||s.colony===Q.p)).forEach(s=>{const k=norm(s.owner),o=M.get(k)||{n:s.owner,m:s.mobile,pl:[],p:0};o.pl.push(s.colony+' '+s.plot);o.p+=s.pend;M.set(k,o)});
+ const L=[...M.values()].map(o=>({...o,f:F_[norm(o.n)]||{}})).sort((a,b)=>(a.f.d||'9999').localeCompare(b.f.d||'9999')),t=today();
+ return`<div class="kpis">${K(L.length,'Parties')}${K(inr(sum(L,'p')),'Pending','bad')}${K(L.filter(o=>o.f.d&&o.f.d<t).length,'Overdue follow-ups','bad')}</div>`+T(['Party','Plots','Pending','Next follow-up','Sales person','Note',''],L.map(o=>[lk(o.n),esc(o.pl.join(', ')),`<b class="bad">${inr(o.p)}</b>`,o.f.d?(o.f.d<t?'<b class="bad">'+esc(o.f.d)+'</b>':esc(o.f.d)):'—',esc(o.f.by||''),esc(o.f.n||''),`<button class="btn g" data-n="${esc(o.n)}" onclick="rpFu(this.dataset.n)">✎</button>`]),[2])},
+cf(){const Q=q(),cb=Object.values(bal()).filter(x=>['Cash-in-hand','Bank Accounts'].includes(x.group)),E=allE().filter(v=>isCB(v.dr)!==isCB(v.cr)&&(!Q.p||v.project===Q.p)),
+ net=a=>sum(a.filter(v=>isCB(v.dr)),'amount')-sum(a.filter(v=>isCB(v.cr)),'amount'),pre=E.filter(v=>Q.f&&String(v.date)<Q.f),per=E.filter(v=>(!Q.f||String(v.date)>=Q.f)&&(!Q.t||String(v.date)<=Q.t)),
+ lab=n=>{const g=gp(n);return g==='Sundry Debtors'?'Collections from buyers':GR[g]==='E'?'Expense — '+n:GR[g]==='I'?'Income — '+n:g+' — '+n},
+ inf=grp(per.filter(v=>isCB(v.dr)),v=>lab(v.cr)),out=grp(per.filter(v=>isCB(v.cr)),v=>lab(v.dr)),op=sum(cb,'open')+net(pre),ti=sum(inf.map(x=>({amount:x[1]})),'amount'),to=sum(out.map(x=>({amount:x[1]})),'amount');
+ return`<div class="kpis">${K(inr(op),'Opening cash + bank')}${K(inr(ti),'Total inflow','ok')}${K(inr(to),'Total outflow','bad')}${K(inr(op+ti-to),'Closing cash + bank')}</div><h4>Inflows</h4>`+T(['Source','Amount'],inf.map(x=>[esc(x[0]),inr(x[1])]),[1])+'<h4>Outflows</h4>'+T(['Use','Amount'],out.map(x=>[esc(x[0]),inr(x[1])]),[1])+'<p class="bt-help">Cash/Bank to Cash/Bank transfers (Contra) are excluded. Use the From / To dates to pick the month.</p>'},
+br(){const Q=q(),C=O('cl'),E=allE().filter(v=>!v.auto&&(gp(v.dr)==='Bank Accounts'||gp(v.cr)==='Bank Accounts')&&inR(v,Q)).sort((a,b)=>String(b.date).localeCompare(String(a.date))),
+ book=sum(Object.values(bal()).filter(x=>x.group==='Bank Accounts'),'close'),un=E.filter(v=>!C[v.id]),ui=sum(un.filter(v=>gp(v.dr)==='Bank Accounts'),'amount'),uo=sum(un.filter(v=>gp(v.cr)==='Bank Accounts'),'amount');
+ return`<div class="kpis">${K(inr(book),'Balance as per books')}${K(inr(ui),'Not yet cleared (deposits)')}${K(inr(uo),'Not yet cleared (payments)')}${K(inr(book-ui+uo),'Expected bank statement balance')}</div><p class="bt-help">Tick an entry when it appears in the bank statement. Match “Expected bank balance” with your statement.</p>`+T(['Cleared','Date','Particulars','Deposit','Payment'],E.map(v=>{const d=gp(v.dr)==='Bank Accounts';return[`<input type="checkbox" ${C[v.id]?'checked':''} onchange="rpCl('${esc(v.id)}',this.checked)">`,esc(v.date),esc(d?v.cr:v.dr)+' <small class="em">'+esc(v.type)+'</small>',d?inr(v.amount):'',d?'':inr(v.amount)]}),[3,4])},
+pa(){const R=Object.values(bal()).filter(x=>['Sundry Creditors','Loans (Liability)'].includes(x.group)&&x.close<-.5).map(x=>{const n=norm(x.name),E=allE().filter(v=>norm(v.cr)===n||norm(v.dr)===n),lots=[];if(x.open<0)lots.push({d:'',a:-x.open});
+  E.filter(v=>norm(v.cr)===n).sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(v=>lots.push({d:v.date,a:v.amount}));let pd=sum(E.filter(v=>norm(v.dr)===n),'amount')+(x.open>0?x.open:0);const bk=[0,0,0,0];
+  lots.forEach(l=>{const t=Math.min(l.a,pd);l.a-=t;pd-=t;if(l.a>.5){const d=l.d?Math.floor((Date.now()-new Date(l.d))/864e5):9999;bk[d<=30?0:d<=60?1:d<=90?2:3]+=l.a}});return{n:x.name,bk,t:-x.close}});
+ return`<div class="kpis">${K(inr(sum(R.map(r=>({a:r.bk[0]})),'a')),'0-30 days')}${K(inr(sum(R.map(r=>({a:r.bk[1]})),'a')),'31-60 days')}${K(inr(sum(R.map(r=>({a:r.bk[2]})),'a')),'61-90 days')}${K(inr(sum(R.map(r=>({a:r.bk[3]})),'a')),'90+ days','bad')}${K(inr(sum(R,'t')),'Total payable','bad')}</div>`+T(['Party','0-30','31-60','61-90','90+','Total'],R.map(r=>[lk(r.n),...r.bk.map(inr),`<b>${inr(r.t)}</b>`]),[1,2,3,4,5])+'<p class="bt-help">Payments are adjusted against the oldest bills first (FIFO).</p>'},
+tg(){const Q=q(),m=(Q.f||today()).slice(0,7),T_=O('tg'),P=Q.p?[Q.p]:pj(),R=P.map(p=>{const c=sum(allE().filter(v=>v.type==='Receipt'&&v.project===p&&String(v.date).startsWith(m)),'amount'),t=+T_[p+'|'+m]||0;return{p,c,t}});
+ return`<div class="kpis">${K(mo(m),'Month (change From date)')}${K(inr(sum(R,'t')),'Target')}${K(inr(sum(R,'c')),'Collected','ok')}${K(sum(R,'t')?(sum(R,'c')/sum(R,'t')*100).toFixed(0)+'%':'—','Achieved')}</div>`+T(['Project','Target (₹)','Collected','Gap','Achieved',''],R.map(r=>[esc(r.p),`<input type="number" style="width:120px" value="${r.t||''}" data-k="${esc(r.p+'|'+m)}" onchange="rpTg(this)">`,inr(r.c),`<b class="${r.c>=r.t?'ok':'bad'}">${inr(r.t-r.c)}</b>`,r.t?(r.c/r.t*100).toFixed(0)+'%':'—',r.t?bar(r.c/r.t*100):'']),[2,3,4])},
+cm(){const R=A('cm'),led=sum(exp_().filter(v=>/commission|brokerage/i.test(v.dr)),'amount');
+ return addB('cm','Add commission')+`<div class="kpis">${K(inr(sum(R,'amt')),'Total commission')}${K(inr(sum(R,'paid')),'Paid','ok')}${K(inr(sum(R,'amt')-sum(R,'paid')),'Baki','bad')}${K(inr(led),'Brokerage ledger paid (Day Book)')}</div>`+T(['Agent','Project','Plot','Commission','Paid','Baki',''],R.map(x=>[esc(x.agent),esc(x.pj),esc(x.plot),inr(x.amt),inr(x.paid),`<b class="${x.amt-x.paid>.5?'bad':'ok'}">${inr(x.amt-x.paid)}</b>`,`<button class="btn g" onclick="rpPay('cm','${x.id}','paid')">+ Paid</button> ${dBtn('cm',x.id)}`]),[3,4,5])},
+sal(){return`<div class="bt-card"><b>Salary Report</b><p class="bt-help">Employees, advances, monthly salary and reports live in the Salary section.</p><button class="btn" onclick="var f=document.getElementById('sal-fab');f?f.click():toast('Salary add-on is not installed')">Open Salary</button></div>`},
+ab(){const Q=q(),F_=O('fc'),R=(Q.p?[Q.p]:pj()).map(p=>{const f=F_[p]||{s:0,e:0};return{p,fs:+f.s||0,fe:+f.e||0,as:sum(sold(p),'deal'),ae:expP(p)}});
+ return`<div class="kpis">${K(inr(sum(R,'fs')),'Forecast sales')}${K(inr(sum(R,'as')),'Actual sales','ok')}${K(inr(sum(R,'fe')),'Forecast expense')}${K(inr(sum(R,'ae')),'Actual expense','bad')}</div>`+T(['Project','Fcst sales','Actual sales','Variance','Fcst expense','Actual expense','Variance',''],R.map(r=>[esc(r.p),inr(r.fs),inr(r.as),`<b class="${r.as>=r.fs?'ok':'bad'}">${inr(r.as-r.fs)}</b>`,inr(r.fe),inr(r.ae),`<b class="${r.ae<=r.fe?'ok':'bad'}">${inr(r.fe-r.ae)}</b>`,`<button class="btn g" data-p="${esc(r.p)}" onclick="rpFc(this.dataset.p)">✎ Set forecast</button>`]),[1,2,3,4,5,6])},
+pp(){const Q=q(),rows=[];(Q.p?[Q.p]:pj()).forEach(p=>{const n=S.stock.filter(s=>s.colony===p).length||1,c=expP(p)/n;sold(p).forEach(s=>rows.push([esc(p),esc(s.plot),lk(s.owner),inr(s.deal),inr(c),s.deal-c,s.deal?((s.deal-c)/s.deal*100):0]))});
+ return`<div class="kpis">${K(rows.length,'Sold plots')}${K(inr(sum(rows.map(r=>({a:r[3]?num(r[3]):0})),'a')),'Sold value')}</div>`+T(['Project','Plot','Buyer','Deal','Cost / plot','Profit','Margin'],rows.map(r=>[r[0],r[1],r[2],r[3],r[4],`<b class="${r[5]>=0?'ok':'bad'}">${inr(r[5])}</b>`,r[6].toFixed(0)+'%']),[3,4,5,6])+'<p class="bt-help">Cost per plot = project expenses (enter land cost as an expense with the project) ÷ total plots of that project.</p>'},
+lo(){return addB('land','Add land owner deal')+pdTable('land')+'<p class="bt-help">“Paid” is calculated from Day Book vouchers where the owner ledger is Debited (Payment).</p>'},
+iv(){return addB('inv','Add investor / partner')+pdTable('inv')+'<p class="bt-help">Received = Credits to the investor ledger. Profit share = (project sales − project expenses) × share %.</p>'},
+co(){const R=A('ob').slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))),b=Object.values(bal()),liq=sum(b.filter(x=>['Cash-in-hand','Bank Accounts'].includes(x.group)),'close'),M={};R.forEach(x=>{const k=String(x.date).slice(0,7);(M[k]=M[k]||{i:0,o:0})[x.type==='in'?'i':'o']+=x.amt});let run=liq;
+ return addB('ob','Add expected in / out')+`<div class="kpis">${K(inr(liq),'Cash + bank now')}${K(inr(sum(S.stock.filter(s=>s.owner),'pend')),'Total receivable','ok')}${K(inr(-sum(b.filter(x=>['Sundry Creditors','Loans (Liability)'].includes(x.group)&&x.close<0),'close')),'Total payable','bad')}</div>`+T(['Month','Aane wala (In)','Dene wala (Out)','Net','Running balance'],Object.keys(M).sort().map(k=>{run+=M[k].i-M[k].o;return[mo(k),inr(M[k].i),inr(M[k].o),inr(M[k].i-M[k].o),`<b class="${run>=0?'ok':'bad'}">${inr(run)}</b>`]}),[1,2,3,4])+'<h4>Entries</h4>'+T(['Date','Type','Party','Note','Amount',''],R.map(x=>[esc(x.date),x.type==='in'?'In':'Out',esc(x.party),esc(x.note),inr(x.amt),dBtn('ob',x.id)]),[4])},
+cn(){const R=A('cn');return addB('cn','Add cancelled booking')+`<div class="kpis">${K(R.length,'Cancelled')}${K(inr(sum(R,'paid')),'Received earlier')}${K(inr(sum(R,'amt')),'Refund due')}${K(inr(sum(R,'amt')-sum(R,'ret')),'Refund baki','bad')}</div>`+T(['Date','Project','Plot','Buyer','Received','Refund due','Refunded','Baki',''],R.map(x=>[esc(x.date),esc(x.pj),esc(x.plot),esc(x.party),inr(x.paid),inr(x.amt),inr(x.ret),`<b class="${x.amt-x.ret>.5?'bad':'ok'}">${inr(x.amt-x.ret)}</b>`,`<button class="btn g" onclick="rpPay('cn','${x.id}','ret')">+ Refund</button> ${dBtn('cn',x.id)}`]),[4,5,6,7])+'<p class="bt-help">To free the plot, also use ↩ Unsell in Sales &amp; Purchase → Project Sales Details.</p>'},
+ap(){const Q=q(),y=fy(Q.f||today()),f=y+'-04-01',t=(y+1)+'-03-31',inc={},ex={},M={};
+ allE().filter(v=>String(v.date)>=f&&String(v.date)<=t&&(!Q.p||v.project===Q.p)).forEach(v=>{const k=String(v.date).slice(0,7);[[v.dr,1],[v.cr,-1]].forEach(([n,s])=>{const g=GR[gp(n)];M[k]=M[k]||0;if(g==='I'){inc[n]=(inc[n]||0)-s*v.amount;M[k]-=s*v.amount}else if(g==='E'){ex[n]=(ex[n]||0)+s*v.amount;M[k]-=s*v.amount}})});
+ const ti=sum(Object.values(inc).map(a=>({a})),'a'),te=sum(Object.values(ex).map(a=>({a})),'a'),np=ti-te,ms=[];for(let i=0;i<12;i++){const d=new Date(y,3+i,1);ms.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'))}
+ return`<div class="kpis">${K('FY '+y+'-'+String(y+1).slice(2),'Financial year (change From date)')}${K(inr(ti),'Income','ok')}${K(inr(te),'Expenses','bad')}${K(inr(Math.abs(np)),np>=0?'Net profit':'Net loss',np>=0?'ok':'bad')}</div>`+T(['Particulars','Amount'],Object.entries(inc).map(([k,v])=>['Income — '+esc(k),inr(v)]).concat(Object.entries(ex).map(([k,v])=>['Expense — '+esc(k),inr(v)]),[Object.assign(['<b>'+(np>=0?'Net Profit':'Net Loss')+'</b>',inr(Math.abs(np))],{tot:1})]),[1])+'<h4>Month-wise net</h4>'+bars(ms.map(k=>[mo(k),M[k]||0]))},
+dk(){const Q=q(),y=fy(Q.f||today()),R=A('dk').filter(x=>x.fy==y);return`<div class="chips"><button class="btn" onclick="rpAdd('dk')">+ Add document</button><button class="btn g" style="color:var(--ink)" onclick="rpDefDocs(${y})">Add standard checklist</button></div><div class="kpis">${K('FY '+y+'-'+String(y+1).slice(2),'Year (change From date)')}${K(R.filter(x=>x.st==='Done').length+' / '+R.length,'Done','ok')}</div>`+T(['Document','Status','Note',''],R.map(x=>[esc(x.t),`<select onchange="rpDk('${x.id}',this.value)">${['Pending','Received','Done'].map(s=>`<option ${s===x.st?'selected':''}>${s}</option>`).join('')}</select>`,esc(x.note),dBtn('dk',x.id)]))}
+};
+
+const DF={cm:{t:'Add commission',f:()=>[{l:'Agent / mediator',d:1},{l:'Project',o:['',...pj()]},{l:'Plot'},{l:'Commission amount (₹)',t:'number'}],m:a=>({agent:a[0],pj:a[1],plot:a[2],amt:num(a[3]),paid:0}),ok:a=>a[0]&&num(a[3])>0},
+land:{k:'pd',t:'Land owner deal',f:()=>[{l:'Owner ledger name',d:1},{l:'Project',o:['',...pj()]},{l:'Total deal amount (₹)',t:'number'}],m:a=>({kind:'land',party:a[0],pj:a[1],amt:num(a[2])}),ok:a=>a[0]&&num(a[2])>0},
+inv:{k:'pd',t:'Investor / partner',f:()=>[{l:'Investor ledger name',d:1},{l:'Project',o:['',...pj()]},{l:'Agreed investment (₹)',t:'number'},{l:'Profit share %',t:'number'}],m:a=>({kind:'inv',party:a[0],pj:a[1],amt:num(a[2]),pct:num(a[3])}),ok:a=>a[0]&&num(a[2])>0},
+ob:{t:'Expected in / out',f:()=>[{l:'Type',o:['in','out']},{l:'Expected date',t:'date',v:today()},{l:'Party'},{l:'Amount (₹)',t:'number'},{l:'Note'}],m:a=>({type:a[0],date:a[1],party:a[2],amt:num(a[3]),note:a[4]}),ok:a=>a[1]&&num(a[3])>0},
+cn:{t:'Cancelled booking',f:()=>[{l:'Project',o:['',...pj()]},{l:'Plot'},{l:'Refund amount (₹)',t:'number'},{l:'Cancel date',t:'date',v:today()},{l:'Note'}],m:a=>{const s=S.stock.find(x=>x.colony===a[0]&&String(x.plot)===a[1]);return{pj:a[0],plot:a[1],party:s?s.owner:'',paid:s?s.got:0,amt:num(a[2]),date:a[3],note:a[4],ret:0}},ok:a=>a[0]&&a[1]},
+dk:{t:'Document',f:()=>[{l:'Document name'},{l:'Status',o:['Pending','Received','Done']},{l:'Note'}],m:a=>({fy:fy(q().f||today()),t:a[0],st:a[1],note:a[2]}),ok:a=>a[0]}};
+window.rpAdd=k=>{const d=DF[k];eb(d.t,d.f(),a=>{if(!d.ok(a)){toast('Fill the required fields');return false}A(d.k||k).push({id:uid(),...d.m(a)});save();rp()})};
+window.rpDel=(k,id)=>{if(!confirm('Delete this entry?'))return;RX()[k]=A(k).filter(x=>x.id!==id);save();rp()};
+window.rpPay=(k,id,f)=>{const x=A(k).find(z=>z.id===id);if(!x)return;eb('Amount',[{l:'Amount (₹)',t:'number'}],a=>{x[f]=(+x[f]||0)+num(a[0]);save();rp()})};
+window.rpFu=n=>{const o=O('fu')[norm(n)]||{};eb('Follow-up — '+n,[{l:'Next follow-up date',t:'date',v:o.d||''},{l:'Sales person',v:o.by||''},{l:'Note',v:o.n||''}],a=>{O('fu')[norm(n)]={d:a[0],by:a[1],n:a[2]};save();rp()})};
+window.rpFc=p=>{const o=O('fc')[p]||{};eb('Forecast — '+p,[{l:'Forecast sales (₹)',t:'number',v:o.s||''},{l:'Forecast expense (₹)',t:'number',v:o.e||''}],a=>{O('fc')[p]={s:num(a[0]),e:num(a[1])};save();rp()})};
+window.rpTg=e=>{O('tg')[e.dataset.k]=num(e.value);save();rp()};
+window.rpCl=(id,v)=>{const c=O('cl');v?c[id]=1:delete c[id];save();rp()};
+window.rpDk=(id,v)=>{const x=A('dk').find(z=>z.id===id);if(x){x.st=v;save();rp()}};
+window.rpDefDocs=y=>{const ex=A('dk');['ITR acknowledgement','Audit report','Bank statements (all accounts)','Purchase / expense bills','Sales & booking proofs','Registry copies','Land purchase deeds','TDS / TCS certificates','Loan & investor agreements','Salary & attendance records'].forEach(t=>{if(!ex.some(x=>x.fy==y&&x.t===t))ex.push({id:uid(),fy:y,t,st:'Pending',note:''})});save();rp()};
+
+const sec=document.createElement('section');sec.className='view';sec.id='v10';
+sec.innerHTML=`<h2>Reports Plus</h2><div class="f"><div><label>Report</label><select id="rpS" onchange="rpCh()">${[...new Set(RPL.map(r=>r[2]))].map(c=>`<optgroup label="${c}">${RPL.filter(r=>r[2]===c).map(r=>`<option value="${r[0]}">${r[1]}</option>`).join('')}</optgroup>`).join('')}</select></div><div><label>Project</label><select id="rpP" onchange="rp()"></select></div><div><label>From</label><input id="rpF" type="date" onchange="rp()"></div><div><label>To</label><input id="rpT" type="date" onchange="rp()"></div></div><div id="rpO"></div>`;
+document.querySelector('main').appendChild(sec);
+window.rpCh=()=>{const k=$('rpS').value,m=META[k],t=today();$('rpF').value=m==='d'?t:m==='m'?t.slice(0,8)+'01':'';$('rpT').value=m==='d'||m==='m'?t:'';rp()};
+window.rp=j=>{if(typeof j==='string'&&RP[j]&&$('rpS').value!==j){$('rpS').value=j;rpCh();return}
+ const c=$('rpP').value;$('rpP').innerHTML='<option value="">All projects</option>'+pj().map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('rpP').value=c;
+ $('rpO').innerHTML=`<h4>${esc((RPL.find(r=>r[0]===$('rpS').value)||[])[1])} <button class="btn g" onclick="pr(this)">🖨 Print</button></h4>`+RP[$('rpS').value]()};
+TT[10]='Reports Plus';MENU.splice(MENU.length-1,0,['🗂️','Reports Plus',RPL.map(r=>[r[1],10,r[0]])]);VG[8]=MENU.length-1;VG[10]=MENU.length-2;buildSb();
+const _nav=nav;nav=function(i,j){_nav(i,j);if(i===10)rp(j)};const _show=show;show=function(i){_show(i);if(i===10)rp()};
+const _render=render;render=function(){_render();if(F.cv===10)rp()};
+const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend','<button class="tile" style="--c:#0E7490" onclick="nav(10,\'dc\')"><span class="ic">🗂️</span><b>Reports Plus</b><small>Daily · Ageing · Targets · Yearly</small><em>17 more reports</em></button>')};
+sbAct(F.cv===undefined?-1:F.cv);rHome();
+})();
+</script><!-- ===== PROJECT DETAILS + SALARY LAYOUT ADD-ON: paste just before </body>, AFTER Business Tools, Salary and Reports Plus ===== -->
+<style id="pd-css">
+/* ---- Salary: app theme, safe area, tabs ---- */
+#sal-fab{display:none!important}
+#sal-ov{background:var(--paper);color:var(--ink)}
+#sal-ov .sal-top{background:var(--spine);border-bottom:1px solid var(--line);padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+#sal-ov .sal-top button{font-size:28px;padding:0 8px;line-height:1}
+#sal-ov .sal-tabs{background:var(--paper);border-bottom:1px solid var(--line);padding:8px 10px}
+#sal-ov .sal-tabs select{display:none!important}
+#sal-ov .rpt{display:flex;gap:6px;overflow-x:auto;width:100%}
+#sal-ov .rpt button{flex:none;border:1px solid var(--line);background:var(--p2);color:var(--ink);border-radius:20px;padding:8px 14px;font:600 .8rem system-ui,sans-serif}
+#sal-ov .rpt button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+#sal-ov .sal-body{padding:12px 12px calc(24px + env(safe-area-inset-bottom,0px))}
+#sal-ov .sal-card{background:var(--p2);border:1px solid var(--line);border-radius:14px}
+#sal-ov .sal-big{color:var(--ok)}
+#sal-ov .sal-row{border-bottom-color:var(--line)}
+#sal-ov .sal-card input,#sal-ov .sal-card select,#sal-ov .sal-body>select,.sal-mod input{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:10px;font-size:16px;padding:10px}
+#sal-ov .sal-btn,.sal-mod .sal-btn{background:var(--brand);color:#fff;border-radius:10px;padding:11px 16px}
+#sal-ov .sal-btn.alt,.sal-mod .sal-btn.alt{background:none;color:var(--brand);border:1px solid var(--brand)}
+#sal-ov .sal-pos,.sal-mod .sal-pos{color:var(--ok)}#sal-ov .sal-neg,.sal-mod .sal-neg{color:var(--bad)}
+#sal-ov .Clear,.sal-mod .Clear{background:color-mix(in srgb,var(--ok) 22%,transparent);color:var(--ok)}
+#sal-ov .Pending,.sal-mod .Pending{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold)}
+#sal-ov .Hold,.sal-mod .Hold{background:color-mix(in srgb,var(--bad) 22%,transparent);color:var(--bad)}
+#sal-ov .sal-card[style*="overflow"]{overflow-x:auto}
+.sal-mod{background:rgba(0,0,0,.6)}
+.sal-mod .sal-sheet{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px))}
+.sal-mod .sal-card{background:var(--p2);border:1px solid var(--line);border-radius:14px}
+.sal-mod .sal-sheet th,.sal-mod .sal-sheet td{border-bottom-color:var(--line)}
+.sal-mod .sal-card[style*="overflow"]{overflow-x:auto}
+/* ---- Project Details ---- */
+.pd-t{display:flex;gap:6px;overflow-x:auto;margin:8px 0 12px}.pd-t button{flex:none;border:1px solid var(--line);background:var(--p2);color:var(--ink);border-radius:20px;padding:8px 14px;font:600 .8rem var(--sans)}.pd-t button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.pd-al{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--p2)}.pd-al.r{border-color:var(--bad)}.pd-al.y{border-color:var(--gold)}
+</style>
+<script id="pd-js">
+(function(){
+if(window.__pd)return;window.__pd=1;
+const PX=()=>{const d=S.set.pdx||(S.set.pdx={});['inst','dev','doc'].forEach(k=>d[k]=d[k]||[]);d.info=d.info||{};d.plot=d.plot||{};return d},uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const pjs=()=>projects().map(p=>p.name),cur=()=>$('pdP').value,Z={t:0},TABS=['Overview','Plots','Installments','Development','Documents','Alerts'];
+const exp=p=>sum(allE().filter(v=>v.project===p&&GR[(LM().get(norm(v.dr))||{}).group]==='E'),'amount');
+const dBtn=(k,id)=>`<button class="btn g" onclick="pdDel('${k}','${id}')">✕</button>`,days=d=>d?Math.floor((new Date(d)-new Date(today()))/864e5):null;
+const sizeN=s=>num(String(s||'').split(/[^\d.]/).filter(Boolean)[0]);
+
+const V=[
+()=>{const p=cur(),pr=projects().find(x=>x.name===p)||{},c=cst(p),i=PX().info[p]||{},e=exp(p),pf=c.val-e,
+ rows=[['Location',pr.location],['Total plots',pr.plots||c.total],['Land cost',pr.landCost?inr(pr.landCost):''],['Project date',pr.date],['Type',i.type],['Khasra / survey no.',i.kh],['Total area',i.area],['RERA no.',i.rera],['RERA valid till',i.reraEnd],['Approval no.',i.ap],['Approval valid till',i.apEnd],['Launch date',i.launch],['Expected completion',i.compl],['Site incharge',i.inc],['Notes',i.notes]];
+ return`<div class="kpis">${K(c.sold+' / '+c.total,'Plots sold')}${K(c.pct.toFixed(0)+'%','Sales %','ok')}${K(inr(c.val),'Sales amount')}${K(inr(c.got),'Received','ok')}${K(inr(c.pend),'Pending','bad')}${K(inr(e),'Total expense','bad')}${K(inr(pf),'Profit (Sales − Expense)',pf>=0?'ok':'bad')}${K(inr(c.got-e),'Cash profit',c.got-e>=0?'ok':'bad')}${K(inr(e/(c.total||1)),'Cost per plot')}</div><div class="chips"><button class="btn" onclick="pdInfo()">✎ Edit project info</button></div>`+T(['Detail','Value'],rows.map(r=>[r[0],esc(r[1]==null||r[1]===''?'—':r[1])]))},
+()=>{const p=cur(),P=PX().plot,L=S.stock.filter(s=>s.colony===p).sort((a,b)=>String(a.plot).localeCompare(String(b.plot),undefined,{numeric:true}));
+ return`<div class="kpis">${K(L.length,'Plots')}${K(L.filter(s=>s.owner).length,'Sold','ok')}${K(L.filter(s=>!s.owner).length,'Unsold')}</div>`+T(['Plot','Size','Rate / sq ft','Price (rate × size)','Facing','Road','Status','Buyer','Deal','Pending',''],L.map(s=>{const x=P[p+'|'+s.plot]||{},sz=sizeN(s.size);return[esc(s.plot),esc(s.size),x.rate?inr(x.rate):'—',x.rate&&sz?inr(x.rate*sz):'—',esc(x.face||'—'),esc(x.road||'—'),PST[pst(s)][0],s.owner?lk(s.owner):'',s.owner?inr(s.deal):'',s.owner&&s.pend>.5?`<b class="bad">${inr(s.pend)}</b>`:'',`<button class="btn g" data-p="${esc(s.plot)}" onclick="pdPlot(this.dataset.p)">✎</button>`]}),[8,9])},
+()=>{const p=cur(),R=PX().inst.filter(x=>x.pj===p).sort((a,b)=>String(a.date).localeCompare(String(b.date))),t=today(),od=R.filter(x=>!x.paid&&x.date<t);
+ return`<div class="chips"><button class="btn" onclick="pdAdd('inst')">+ Add installment</button></div><div class="kpis">${K(inr(sum(R.filter(x=>!x.paid),'amt')),'Total due')}${K(inr(sum(od,'amt')),'Overdue','bad')}${K(inr(sum(R.filter(x=>x.paid),'amt')),'Paid','ok')}</div>`+T(['Due date','Plot','Buyer','Amount','Status',''],R.map(x=>{const s=S.stock.find(z=>z.colony===p&&String(z.plot)===x.plot);return[esc(x.date),esc(x.plot),esc(s?s.owner:''),inr(x.amt),x.paid?'<span class="ok">Paid</span>':x.date<t?'<b class="bad">Overdue</b>':'Due',`<button class="btn g" onclick="pdTog('${x.id}')">${x.paid?'↩ Undo':'✓ Paid'}</button> ${dBtn('inst',x.id)}`]}),[3])+'<p class="bt-help">This tracks the schedule only. Enter the actual money as a Receipt voucher in Day Book.</p>'},
+()=>{const p=cur(),R=PX().dev.filter(x=>x.pj===p);
+ return`<div class="chips"><button class="btn" onclick="pdAdd('dev')">+ Add work</button></div><div class="kpis">${K(inr(sum(R,'val')),'Total work value')}${K(inr(sum(R,'paid')),'Paid','ok')}${K(inr(sum(R,'val')-sum(R,'paid')),'Baki','bad')}${K(R.length?(sum(R,'pct')/R.length).toFixed(0)+'%':'—','Average progress')}</div>`+T(['Work','Contractor','Value','Paid','Baki','Progress',''],R.map(x=>[esc(x.work),esc(x.vendor),inr(x.val),inr(x.paid),`<b class="${x.val-x.paid>.5?'bad':'ok'}">${inr(x.val-x.paid)}</b>`,x.pct+'% '+bar(x.pct),`<button class="btn g" onclick="pdPay('${x.id}')">+ Paid</button> <button class="btn g" onclick="pdPct('${x.id}')">%</button> ${dBtn('dev',x.id)}`]),[2,3,4])},
+()=>{const p=cur(),R=PX().doc.filter(x=>x.pj===p);
+ return`<div class="chips"><button class="btn" onclick="pdAdd('doc')">+ Add document</button><button class="btn g" style="color:var(--ink)" onclick="pdDefDocs()">Add standard checklist</button></div><div class="kpis">${K(R.filter(x=>x.st==='Done').length+' / '+R.length,'Done','ok')}</div>`+T(['Document','Status',''],R.map(x=>[esc(x.t),`<select onchange="pdDocSt('${x.id}',this.value)">${['Pending','Received','Done'].map(s=>`<option ${s===x.st?'selected':''}>${s}</option>`).join('')}</select>`,dBtn('doc',x.id)]))},
+()=>{const p=cur(),i=PX().info[p]||{},A_=[],t=today();
+ [['RERA',i.reraEnd],['Approval',i.apEnd]].forEach(([n,d])=>{const k=days(d);if(d&&k<0)A_.push(['r',n+' expired on '+d]);else if(d&&k<=60)A_.push(['y',n+' expires in '+k+' days ('+d+')'])});
+ PX().inst.filter(x=>x.pj===p&&!x.paid).forEach(x=>{const k=days(x.date),s=S.stock.find(z=>z.colony===p&&String(z.plot)===x.plot);if(k<0)A_.push(['r','Installment overdue '+(-k)+' days — plot '+x.plot+(s?' ('+s.owner+')':'')+' '+inr(x.amt)]);else if(k<=7)A_.push(['y','Installment due in '+k+' days — plot '+x.plot+' '+inr(x.amt)])});
+ const rg=S.stock.filter(s=>s.colony===p&&s.owner&&s.reg!=='Done').length;if(rg)A_.push(['y',rg+' plots with registry not complete']);
+ return A_.length?A_.map(a=>`<div class="pd-al ${a[0]}">${a[0]==='r'?'🔴':'🟡'} ${esc(a[1])}</div>`).join(''):'<p class="ok">No alerts for this project ✓</p>'}];
+
+const DF={inst:{t:'Installment',f:p=>[{l:'Plot',o:['',...S.stock.filter(s=>s.colony===p&&s.owner).map(s=>String(s.plot))]},{l:'Due date',t:'date',v:today()},{l:'Amount (₹)',t:'number'}],m:a=>({plot:a[0],date:a[1],amt:num(a[2]),paid:0}),ok:a=>a[0]&&a[1]&&num(a[2])>0},
+dev:{t:'Development work',f:()=>[{l:'Work (road, drainage, light…)'},{l:'Contractor / vendor'},{l:'Work value (₹)',t:'number'},{l:'Progress %',t:'number'}],m:a=>({work:a[0],vendor:a[1],val:num(a[2]),paid:0,pct:Math.min(100,num(a[3]))}),ok:a=>a[0]},
+doc:{t:'Document',f:()=>[{l:'Document name'},{l:'Status',o:['Pending','Received','Done']}],m:a=>({t:a[0],st:a[1]}),ok:a=>a[0]}};
+const find=(k,id)=>PX()[k].find(x=>x.id===id),done=()=>{save();pd()};
+window.pdAdd=k=>{const d=DF[k],p=cur();eb(d.t+' — '+p,d.f(p),a=>{if(!d.ok(a)){toast('Fill the required fields');return false}PX()[k].push({id:uid(),pj:p,...d.m(a)});done()})};
+window.pdDel=(k,id)=>{if(!confirm('Delete this entry?'))return;PX()[k]=PX()[k].filter(x=>x.id!==id);done()};
+window.pdTog=id=>{const x=find('inst',id);if(x){x.paid=x.paid?0:1;done()}};
+window.pdPay=id=>{const x=find('dev',id);if(x)eb('Amount paid now',[{l:'Amount (₹)',t:'number'}],a=>{x.paid+=num(a[0]);done()})};
+window.pdPct=id=>{const x=find('dev',id);if(x)eb('Progress %',[{l:'Progress (0-100)',t:'number',v:x.pct}],a=>{x.pct=Math.min(100,Math.max(0,num(a[0])));done()})};
+window.pdDocSt=(id,v)=>{const x=find('doc',id);if(x){x.st=v;done()}};
+window.pdDefDocs=()=>{const p=cur(),D=PX().doc;['Land registry / title papers','Layout / naksha approval','RERA certificate','Diversion / conversion order','NOC (electricity, water, fire)','Agreement copies','Development permission'].forEach(t=>{if(!D.some(x=>x.pj===p&&x.t===t))D.push({id:uid(),pj:p,t,st:'Pending'})});done()};
+window.pdInfo=()=>{const p=cur(),i=PX().info[p]||{};eb('Project info — '+p,[{l:'Type',o:['','Residential','Commercial','Farm / Agriculture','Mixed'],v:i.type||''},{l:'Khasra / survey no.',v:i.kh},{l:'Total area',v:i.area},{l:'RERA no.',v:i.rera},{l:'RERA valid till',t:'date',v:i.reraEnd},{l:'Approval no.',v:i.ap},{l:'Approval valid till',t:'date',v:i.apEnd},{l:'Launch date',t:'date',v:i.launch},{l:'Expected completion',t:'date',v:i.compl},{l:'Site incharge',v:i.inc},{l:'Notes',v:i.notes}],a=>{PX().info[p]={type:a[0],kh:a[1],area:a[2],rera:a[3],reraEnd:a[4],ap:a[5],apEnd:a[6],launch:a[7],compl:a[8],inc:a[9],notes:a[10]};done()})};
+window.pdPlot=pl=>{const p=cur(),k=p+'|'+pl,x=PX().plot[k]||{};eb('Plot '+pl+' — '+p,[{l:'Rate per sq ft (₹)',t:'number',v:x.rate||''},{l:'Facing',o:['','East','West','North','South'],v:x.face||''},{l:'Road width',v:x.road||''}],a=>{PX().plot[k]={rate:num(a[0]),face:a[1],road:a[2]};done()})};
+
+const sec=document.createElement('section');sec.className='view';sec.id='v11';
+sec.innerHTML='<h2>Project Details</h2><div class="f"><div><label>Project</label><select id="pdP" onchange="pd()"></select></div></div><div class="pd-t" id="pdT"></div><div id="pdO"></div>';
+document.querySelector('main').appendChild(sec);
+window.pd=j=>{if(j!=null&&j!==''&&!isNaN(+j))Z.t=+j;const c=$('pdP').value,P=pjs();$('pdP').innerHTML=P.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(P.includes(c))$('pdP').value=c;
+ $('pdT').innerHTML=TABS.map((t,i)=>`<button class="${i===Z.t?'on':''}" onclick="pd(${i})">${t}</button>`).join('');
+ $('pdO').innerHTML=P.length?`<div style="text-align:right"><button class="btn g" onclick="pr(this)">🖨 Print</button></div>`+V[Z.t]():'<p class="em">No projects yet — add one in Sales &amp; Purchase → Purchase.</p>'};
+
+/* ---- Salary: tab buttons instead of dropdown ---- */
+const so=document.getElementById('sal-ov');
+if(so){const mk=()=>{const t=so.querySelector('.sal-tabs'),s=t&&t.querySelector('select');if(!s||t.querySelector('.rpt'))return;const w=document.createElement('div');w.className='rpt';[...s.options].forEach(o=>{const b=document.createElement('button');b.textContent=o.text;b.className=o.value===s.value?'on':'';b.onclick=()=>{s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}))};w.appendChild(b)});t.appendChild(w)};new MutationObserver(mk).observe(so,{childList:true});mk()}
+window.salOpen=j=>{const f=$('sal-fab');if(!f)return toast('Salary add-on is not installed');f.click();if(j){const s=document.querySelector('#sal-ov select[data-a=sec]');if(s){s.value=j;s.dispatchEvent(new Event('change',{bubbles:true}))}}};
+
+TT[11]='Project Details';TT[12]='Salary';
+MENU.splice(MENU.length-1,0,['📋','Project Details',TABS.map((t,i)=>[t,11,i])],['💰','Salary',[['Dashboard',12,'dash'],['Employees',12,'emps'],['Advances',12,'adv'],['Report',12,'rep'],['Settings',12,'set']]]);
+VG[11]=MENU.length-3;VG[12]=MENU.length-2;VG[8]=MENU.length-1;buildSb();
+const _nav=nav;nav=function(i,j){if(i===12){if($('sb').classList.contains('open'))sbT();salOpen(j);return}_nav(i,j);if(i===11)pd(j)};
+const _show=show;show=function(i){_show(i);if(i===11)pd()};
+const _render=render;render=function(){_render();if(F.cv===11)pd()};
+const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend','<button class="tile" style="--c:#7C3AED" onclick="nav(11,0)"><span class="ic">📋</span><b>Project Details</b><small>Info · Plots · Installments</small><em>Per project</em></button><button class="tile" style="--c:#15803D" onclick="nav(12,\'dash\')"><span class="ic">💰</span><b>Salary</b><small>Employees · Advances</small><em>Pay &amp; reports</em></button>')};
+sbAct(F.cv===undefined?-1:F.cv);rHome();
+})();
+</script><!-- ===== DATA CHECK ADD-ON: paste just before </body>, AFTER the other add-on blocks ===== -->
+<script id="dc-js">
+(function(){
+if(window.__dc)return;window.__dc=1;
+const ok=(a,b)=>Math.abs(a-b)<.5,tag=g=>g?'<span class="ok">✅ Match</span>':'<b class="bad">⚠ Mismatch</b>',cnt=a=>Array.isArray(a)?a.length:Object.keys(a||{}).length;
+const sec=document.createElement('section');sec.className='view';sec.id='v13';
+sec.innerHTML='<h2>Data Check</h2><p class="bt-help">Compares what is on this device with what is actually in your Google Sheet, and shows which data is stored only on this device.</p><div class="chips"><button class="btn" onclick="dcRun()">Run check now</button></div><div id="dcO"></div>';
+document.querySelector('main').appendChild(sec);
+function row(l,a,b,f){return[esc(l),f?f(a):a,f?f(b):b,tag(ok(a,b))]}
+window.dcRun=async function(){const O=$('dcO');O.innerHTML='<p class="em">Checking the Sheet…</p>';let d;
+ try{const r=await fetch(URL_+'?t='+encodeURIComponent(TK())+'&_ts='+Date.now(),{cache:'no-store'});d=await r.json()}catch(e){O.innerHTML='<p class="bad">Could not reach the Sheet: '+esc(e.message)+'. Check internet, URL and token (Settings).</p>';return}
+ if(d.error||d.ok===false){O.innerHTML='<p class="bad">Sheet replied with an error: '+esc(d.error||'unknown')+'</p>';return}
+ const sv=d.vouchers||[],st=parse(d.colonies),dv=S.vouchers,shIds=new Set(sv.map(v=>sid(v.id))),dvIds=new Set(dv.map(v=>v.id)),sold=a=>a.filter(s=>s.owner),m=x=>Math.round(x);
+ const cmp=[row('Vouchers',dv.length,sv.length),row('Voucher total amount',sum(dv,'amount'),sum(sv.map(v=>({a:num(v.amount)})),'a'),inr),row('Ledgers (created)',S.ledgers.length,cnt(d.ledgers)),row('Projects',S.projects.length,cnt(d.projects)),
+  row('Plot rows (all colonies)',S.stock.length,st.length),row('Sold plots',sold(S.stock).length,sold(st).length),row('Total deal amount',sum(sold(S.stock),'deal'),sum(sold(st),'deal'),inr),row('Received at booking (sheet column)',sum(sold(S.stock),'recv'),sum(sold(st),'recv'),inr),
+  row('Pitches',S.pitches.length,cnt(d.pitches)),row('Clients',S.clients.length,cnt(d.clients)),row('Tasks',S.tasks.length,cnt(d.tasks))];
+ const up=dv.filter(v=>!shIds.has(v.id)),dn=sv.filter(v=>!dvIds.has(sid(v.id)));
+ const b=Object.values(bal()),reg=S.stock.filter(s=>s.owner&&s.reg==='Done'&&s.pend>.5).length,
+  Q=[['Waiting to upload to Sheet',S.q.length,S.q.length],['Changes the Sheet rejected',S.fail.length,S.fail.length],['Sold plots without mobile no.',S.stock.filter(s=>s.owner&&!s.mobile).length,0],['Plots where received is more than deal',S.stock.filter(s=>s.owner&&s.got>s.deal+.5).length,1],
+   ['Registry “Complete” but payment pending',reg,0],['Expense vouchers with no project',allE().filter(v=>isEx0(v)&&!v.project).length,0],['Debit − Credit difference in books',m(sum(b,'close')-sum(b,'open')),0]];
+ function isEx0(v){return GR[(LM().get(norm(v.dr))||{}).group]==='E'}
+ const R=S.set.rpx||{},P=S.set.pdx||{};let sl={};try{sl=JSON.parse(localStorage.getItem('salaryAddon_v1')||'{}')}catch(e){}let sent={};try{sent=JSON.parse(localStorage.getItem('salaryAddon_v1_sent')||'{}')}catch(e){}
+ const dev=[['Reports Plus — targets, forecast, commission, land owner / investor deals, cancelled, expected in/out, bank ticks, follow-ups, documents',['cm','pd','ob','cn','dk'].reduce((t,k)=>t+cnt(R[k]),0)+['tg','fc','fu','cl'].reduce((t,k)=>t+cnt(R[k]),0)],
+  ['Project Details — info, plot rate / facing, installments, development, documents',cnt(P.info)+cnt(P.plot)+cnt(P.inst)+cnt(P.dev)+cnt(P.doc)],
+  ['Salary — employees / advances / repayments',cnt(sl.emps)+cnt(sl.adv)+cnt(sl.rep)]];
+ O.innerHTML=`<h4>1. Device vs Google Sheet</h4>`+T(['Item','This device','Google Sheet','Result'],cmp,[1,2])
+ +(up.length?`<p class="bad">${up.length} voucher(s) are on this device but not in the Sheet (waiting to upload): ${up.slice(0,8).map(v=>esc((v.no||v.id)+' '+inr(v.amount))).join(', ')}</p>`:'')
+ +(dn.length?`<p class="bad">${dn.length} voucher(s) are in the Sheet but not on this device. Press ⟳ Sync.</p>`:'')
+ +`<h4>2. Data quality</h4>`+T(['Check','Count','Result'],Q.map(q=>[esc(q[0]),q[1],q[1]===q[2]||(q[2]===0&&q[1]===0)?'<span class="ok">✅ OK</span>':'<b class="bad">⚠ Look at this</b>']),[1])
+ +`<h4>3. Stored only on this device (not in the Sheet)</h4>`+T(['Data','Items'],dev.map(x=>[esc(x[0]),x[1]]),[1])
+ +`<p class="bt-help">Salary: ${sl.cfg&&sl.cfg.url?'a Sheet URL is set and '+Object.keys(sent).length+' rows were sent, but Salary posts without a reply, so the app cannot confirm the Sheet received them. Open the Sheet tabs Salary_Records, Salary_Advances and Salary_Repayments to verify.':'no Sheet URL is set in Salary → Settings, so it is device only.'}<br>Reports Plus and Project Details have no Sheet connection yet. Take a Backup if you need that data to be safe.</p>`};
+TT[13]='Data Check';MENU.splice(MENU.length-1,0,['🩺','Data Check',[['Run check',13,0]]]);VG[13]=MENU.length-2;VG[8]=MENU.length-1;buildSb();
+const _show=show;show=function(i){_show(i);if(i===13)dcRun()};
+const _rh=rHome;rHome=function(){_rh();$('tiles').insertAdjacentHTML('beforeend','<button class="tile" style="--c:#0369A1" onclick="go(13)"><span class="ic">🩺</span><b>Data Check</b><small>App vs Sheet</small><em>Is data safe?</em></button>')};
+sbAct(F.cv===undefined?-1:F.cv);rHome();
+})();
+</script></body></html>
