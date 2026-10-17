@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Register — Akshardham Associates</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0B1730">
+<title>Register — RTELLY SYSTEM</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0B1730">
 <style>
 :root{--ink:#1E1B16;--paper:#FBF9F5;--p2:#F3EFE7;--line:#D8D0C2;--brand:#7A2E20;--gold:#8A6D1F;--ok:#2B6A47;--bad:#9C2B22;--sub:#7A7266;--spine:#241D16;--sans:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;--serif:Georgia,serif}
 @media(prefers-color-scheme:dark){:root{--ink:#EDE7DA;--paper:#1B1712;--p2:#251F17;--line:#3A3226;--brand:#C76A4E;--gold:#C7A64D;--ok:#5FAE81;--bad:#E07A6B;--sub:#A79C89;--spine:#0F0C09}}
@@ -85,7 +85,7 @@ header:has(#bk:not([hidden])) #mn{display:none} /* back button replaces menu but
 @media(max-height:520px){header{position:static}}
 </style></head><body>
 <aside id="sb"></aside><div id="ov" onclick="sbT()"></div>
-<header><button id="mn" onclick="sbT()">☰</button><button id="bk" onclick="back()" hidden>‹</button><div class="tt"><b id="ttl">Home</b><small id="sync">Akshardham Associates</small></div><div class="sbx"><input id="gs" placeholder="Search anything… (Ctrl+K)" oninput="gSearch()" autocomplete="off"><div id="sr" class="dd"></div></div><button id="eye" onclick="tgHide()" title="Hide / show amounts">👁</button><span class="dtc" id="dt"></span><button id="bl" onclick="ntT()">🔔<i id="nb"></i></button><button onclick="sync()">⟳</button><span class="avc" id="av" onclick="nav(8)">RP</span><div id="nt" class="dd"></div></header>
+<header><button id="mn" onclick="sbT()">☰</button><button id="bk" onclick="back()" hidden>‹</button><div class="tt"><b id="ttl">Home</b><small id="sync">RTELLY SYSTEM</small></div><div class="sbx"><input id="gs" placeholder="Search anything… (Ctrl+K)" oninput="gSearch()" autocomplete="off"><div id="sr" class="dd"></div></div><button id="eye" onclick="tgHide()" title="Hide / show amounts">👁</button><span class="dtc" id="dt"></span><button id="bl" onclick="ntT()">🔔<i id="nb"></i></button><button onclick="sync()">⟳</button><span class="avc" id="av" onclick="nav(8)">RP</span><div id="nt" class="dd"></div></header>
 <main>
 <section class="view on" id="home"><div id="dash"></div><div id="tk"></div><div class="dh">Sections</div><div class="tiles" id="tiles"></div></section>
 <section class="view" id="v0"><h2>Accounts</h2><div class="seg" data-g="v0"><button class="on">Overview</button><button>Receivable</button><button>Payable</button><button>Cash &amp; Bank</button><button>Ledger</button></div>
@@ -135,7 +135,7 @@ const K=(n,l,c='')=>`<div class="kpi"><b class="${c}">${n}</b><span>${l}</span><
 const SEL=(o,v,fn,id='')=>`<select ${id?`id="${id}"`:''} onchange="${fn}">${o.map(x=>`<option value="${esc(x[0])}" ${x[0]===v?'selected':''}>${esc(x[1])}</option>`).join('')}</select>`;
 let S={stock:[],projects:[],vouchers:[],ledgers:[]},F={pc:'',pj:'',led:'',rc:'',sv:''};
 const VER='v14',uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);let _rt=0;
-const DSET=()=>({name:'Rahul',biz:'Akshardham Associates',phone:'',theme:'dark',compact:0,pin:'',fs:'m',rows:100,hide:0,lockDate:'',srv:0,w:{bn:1,gs:1,rec:1,qa:1,col:1,top:1,tk:1,tl:1},tl:[1,1,1,1,1,1,1],nt:{ready:1,proc:1,late:1,fresh:1,total:1,col:1,days:30},wam:{rem:'Hello {name}, this is {biz}. ₹{amount} is pending for {plots}. Please arrange the payment soon. Thank you.',fu:'Hello {name}, this is {biz}. I am following up on our earlier discussion. Is this a good time to talk?'}});
+const DSET=()=>({name:'Rahul',biz:'RTELLY SYSTEM',phone:'',theme:'dark',compact:0,pin:'',fs:'m',rows:100,hide:0,lockDate:'',srv:0,w:{bn:1,gs:1,rec:1,qa:1,col:1,top:1,tk:1,tl:1},tl:[1,1,1,1,1,1,1],nt:{ready:1,proc:1,late:1,fresh:1,total:1,col:1,days:30},wam:{rem:'Hello {name}, this is {biz}. ₹{amount} is pending for {plots}. Please arrange the payment soon. Thank you.',fu:'Hello {name}, this is {biz}. I am following up on our earlier discussion. Is this a good time to talk?'}});
 const fixSet=()=>{const d=DSET();S.set=Object.assign(d,S.set||{});['w','nt','wam'].forEach(k=>S.set[k]=Object.assign(DSET()[k],S.set[k]||{}));S.set.tl=[0,1,2,3,4,5,6].map(i=>S.set.tl&&S.set.tl[i]===0?0:1)};
 const normS=()=>{['stock','projects','vouchers','ledgers','pitches','clients','tasks','tpl','q','old','fail','audit','errs'].forEach(k=>S[k]=Array.isArray(S[k])?S[k]:[]);fixSet()};
 const logErr=m=>{S.errs.push({t:Date.now(),e:String(m)});S.errs=S.errs.slice(-10);save()};
@@ -440,7 +440,7 @@ ${apHtml()}
 ${layHtml()}
 <div class="cd"><h4>💾 Data & Backup</h4><p class="em">Pitches, tasks and templates are stored only on this device. Please take a backup.</p><div class="seg"><button onclick="bkExp()">Download backup</button><button onclick="$('bkF').click()">Restore</button><button onclick="bkClr()" style="color:var(--bad)">Clear local data</button></div><input id="bkF" type="file" accept=".json" style="display:none" onchange="bkImp(this)"><div class="f" style="margin-top:10px"><div><label>Sheet token (from Apps Script setup)</label><input id="sTk" type="password" value="${esc(s.token||'')}"></div></div><div class="seg"><button onclick="S.set.token=$('sTk').value.trim();save();sync();toast('Token saved')">Save token &amp; sync</button></div><p class="em">${S.q.length?S.q.length+' change(s) waiting to reach the sheet.':'Everything is saved to the sheet.'}</p><div class="seg"><button onclick="diag()">Test connection</button><button onclick="demoLoad()">Load demo data</button><button onclick="demoClear()" style="color:var(--bad)">Remove demo data</button></div><pre class="em" style="white-space:pre-wrap;font-size:.78rem">${esc(DG)}</pre>${failHtml()}</div>
 </div>`}
-function setSave(){S.set.name=$('sN').value.trim()||'Rahul';S.set.biz=$('sB').value.trim()||'Akshardham Associates';S.set.phone=$('sM').value.trim();save();applySet();render();toast('Settings saved')}
+function setSave(){S.set.name=$('sN').value.trim()||'Rahul';S.set.biz=$('sB').value.trim()||'RTELLY SYSTEM';S.set.phone=$('sM').value.trim();save();applySet();render();toast('Settings saved')}
 function bkExp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='register_backup_'+today()+'.json';a.click()}
 function bkImp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||typeof d!=='object'||Array.isArray(d))throw 0;S=Object.assign(S,d);normS();save();render();applySet();toast('Restored')}catch(e){toast('Invalid file')}};r.readAsText(f)}
 function bkClr(){if(confirm('Clear all local data on this device? (Sheet data stays safe)')){localStorage.removeItem(KEY);try{indexedDB.deleteDatabase('akr')}catch(e){}location.reload()}}
